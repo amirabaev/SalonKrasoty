@@ -352,22 +352,15 @@ def get_phone(message):
                 
                 user_data[chat_id]['phone'] = phone
                 def send_booking_to_admin(chat_id):
-    """
-    Отправляет заявку админу и благодарит клиента
-    ИСПРАВЛЕНО: теперь клиент НЕ видит ложных ошибок!
-    """
+    """Отправляет заявку админу и благодарит клиента"""
     if chat_id not in user_data:
         return
     
     name = user_data[chat_id]['name']
     phone = user_data[chat_id]['phone']
     
-    # ================ 1. ПЫТАЕМСЯ ОТПРАВИТЬ АДМИНУ ================
-    admin_ok = False
-    error_text = ""
-    
+    # Отправка админу
     try:
-        # УБИРАЕМ parse_mode или используем HTML (надёжнее)
         admin_message = f"""
 🔔 НОВАЯ ЗАЯВКА!
 
@@ -375,20 +368,12 @@ def get_phone(message):
 📱 Телефон: {phone}
 📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}
         """
-        
-        bot.send_message(ADMIN_CHAT_ID, admin_message)  # БЕЗ parse_mode!
-        admin_ok = True
+        bot.send_message(ADMIN_CHAT_ID, admin_message)
         print(f"✅ Заявка от {name} отправлена админу")
-        
     except Exception as e:
-        # ЗАПИСЫВАЕМ ОШИБКУ В ЛОГ, НО НЕ ПАНИКУЕМ!
-        error_text = str(e)
-        print(f"⚠️ Не удалось отправить админу: {error_text}")
-        admin_ok = False
+        print(f"⚠️ Ошибка отправки админу: {e}")
     
-    # ================ 2. КЛИЕНТ ВСЕГДА ВИДИТ ТОЛЬКО УСПЕХ ================
-    # КЛИЕНТ НЕ ДОЛЖЕН ЗНАТЬ О ТЕХНИЧЕСКИХ ПРОБЛЕМАХ!
-    
+    # Ответ клиенту
     thank_you_text = f"""
 ✅ *Спасибо, {name}!*
 
@@ -397,7 +382,16 @@ def get_phone(message):
 
 Хотите записаться на что-то еще? 🌸
     """
+    bot.send_message(
+        chat_id, 
+        thank_you_text, 
+        parse_mode='Markdown', 
+        reply_markup=main_keyboard()
+    )
     
+    # Очистка данных
+    if chat_id in user_data:
+        del user_data[chat_id]
     bot.send_message(
         chat_id, 
         thank_you_text, 
@@ -554,5 +548,6 @@ if __name__ == '__main__':
             time.sleep(5)
 
             print("🔄 Перезапускаю...")
+
 
 

@@ -2,19 +2,22 @@ import telebot
 from telebot import types
 import re
 from datetime import datetime
-
-# ================ ВСТАВЬ СВОИ ДАННЫЕ СЮДА ================
-TOKEN = '8086852567:AAH77qUsDbu7RgwxVAHEDBOxMVAP2bLiBKg'  # СЮДА ТОКЕН ОТ BOTFATHER
-ADMIN_CHAT_ID = '6627729254'  # СЮДА ТВОЙ ID ОТ USERINFOBOT
-# ========================================================
-
+TOKEN = '8086852567:AAH77qUsDbu7RgwxVAHEDBOxMVAP2bLiBKg' 
+ADMIN_CHAT_ID = '6627729254'  
 bot = telebot.TeleBot(TOKEN)
 user_data = {}
-
-# ------------------------------------------------------------
-# ФУНКЦИИ СОЗДАНИЯ КЛАВИАТУР (КНОПОК)
-# ------------------------------------------------------------
-
+def safe_send_message(chat_id, text, parse_mode=None):
+    """
+    Безопасная отправка сообщений.
+    Автоматически убирает Markdown, если он ломается.
+    """
+    try:
+        if parse_mode == 'Markdown':
+            # Пробуем с Markdown
+            return bot.send_message(chat_id, text, parse_mode='Markdown')
+    except:
+        # Если ошибка — отправляем без форматирования
+        return bot.send_message(chat_id, text)
 def main_keyboard():
     """
     ГЛАВНОЕ МЕНЮ - появляется после /start и когда нажимаем "Назад"
@@ -55,22 +58,14 @@ def back_button_only():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add("🔙 Назад в главное меню")
     return keyboard
-
-# ------------------------------------------------------------
-# ФУНКЦИЯ ПРОВЕРКИ И ВОЗВРАТА В МЕНЮ
-# ------------------------------------------------------------
-
 def check_back_button(message):
     """
     Проверяет, нажал ли пользователь кнопку "Назад"
     Возвращает True и отправляет в главное меню, если нажал
     """
     if message.text == "🔙 Назад в главное меню":
-        # Удаляем данные пользователя, если он был в процессе записи
         if message.chat.id in user_data:
             del user_data[message.chat.id]
-        
-        # Отправляем в главное меню
         bot.send_message(
             message.chat.id, 
             "🏠 Вы вернулись в главное меню",
@@ -79,16 +74,12 @@ def check_back_button(message):
         return True
     return False
 
-# ------------------------------------------------------------
-# ОБРАБОТЧИК КОМАНДЫ /start
-# ------------------------------------------------------------
-
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     """Приветствие и главное меню"""
     user_name = message.from_user.first_name
     
-    # Очищаем данные пользователя при старте
+    
     if message.chat.id in user_data:
         del user_data[message.chat.id]
     
@@ -108,9 +99,7 @@ def send_welcome(message):
         reply_markup=main_keyboard()
     )
 
-# ------------------------------------------------------------
-# ОБРАБОТЧИК КНОПКИ "УСЛУГИ"
-# ------------------------------------------------------------
+
 
 @bot.message_handler(func=lambda message: message.text == "💇‍♀️ Услуги")
 def services(message):
@@ -362,35 +351,74 @@ def get_phone(message):
                     phone = '+7' + phone[1:]
                 
                 user_data[chat_id]['phone'] = phone
-                send_booking_to_admin(chat_id)
-            else:
-                bot.send_message(
-                    chat_id, 
-                    "❌ Номер слишком короткий. Введите полный номер:",
-                    reply_markup=back_and_phone_keyboard()
-                )
-                bot.register_next_step_handler(message, get_phone)
-        else:
-            bot.send_message(
-                chat_id, 
-                "❌ Неверный формат. Используйте: +7XXXXXXXXXX или 8XXXXXXXXXX",
-                reply_markup=back_and_phone_keyboard()
-            )
-            bot.register_next_step_handler(message, get_phone)
-    else:
-        # Если ничего не отправил
-        bot.send_message(
-            chat_id, 
-            "❌ Пожалуйста, отправьте номер телефона:",
-            reply_markup=back_and_phone_keyboard()
-        )
-        bot.register_next_step_handler(message, get_phone)
+               def send_booking_to_admin(chat_id):
+    """
+    Отправляет заявку админу и благодарит клиента
+    ИСПРАВЛЕНО: теперь клиент НЕ видит ложных ошибок!
+    """
+    if chat_id not in user_data:
+        return
+    
+    name = user_data[chat_id]['name']
+    phone = user_data[chat_id]['phone']
+    
+    # ================ 1. ПЫТАЕМСЯ ОТПРАВИТЬ АДМИНУ ================
+    admin_ok = False
+    error_text = ""
+    
+    try:
+        # УБИРАЕМ parse_mode или используем HTML (надёжнее)
+        admin_message = f"""
+🔔 НОВАЯ ЗАЯВКА!
 
-# ------------------------------------------------------------
-# ОТПРАВКА ЗАЯВКИ АДМИНУ
-# ------------------------------------------------------------
+👤 Имя: {name}
+📱 Телефон: {phone}
+📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}
+        """
+        
+        bot.send_message(ADMIN_CHAT_ID, admin_message)  # БЕЗ parse_mode!
+        admin_ok = True
+        print(f"✅ Заявка от {name} отправлена админу")
+        
+    except Exception as e:
+        # ЗАПИСЫВАЕМ ОШИБКУ В ЛОГ, НО НЕ ПАНИКУЕМ!
+        error_text = str(e)
+        print(f"⚠️ Не удалось отправить админу: {error_text}")
+        admin_ok = False
+    
+    # ================ 2. КЛИЕНТ ВСЕГДА ВИДИТ ТОЛЬКО УСПЕХ ================
+    # КЛИЕНТ НЕ ДОЛЖЕН ЗНАТЬ О ТЕХНИЧЕСКИХ ПРОБЛЕМАХ!
+    
+    thank_you_text = f"""
+✅ *Спасибо, {name}!*
 
-def send_booking_to_admin(chat_id):
+Ваша заявка принята! 📨
+Мы свяжемся с вами по номеру {phone} в ближайшее время.
+
+Хотите записаться на что-то еще? 🌸
+    """
+    
+    bot.send_message(
+        chat_id, 
+        thank_you_text, 
+        parse_mode='Markdown', 
+        reply_markup=main_keyboard()
+    )
+    
+    # ================ 3. УВЕДОМЛЕНИЕ АДМИНУ В ЛИЧКУ (ДУБЛЬ) ================
+    # Если первая отправка не удалась, пробуем ЕЩЁ РАЗ без Markdown
+    
+    if not admin_ok:
+        try:
+            # Пробуем отправить УЖЕ БЕЗ Markdown
+            simple_message = f"🔔 Новая заявка!\nИмя: {name}\nТелефон: {phone}"
+            bot.send_message(ADMIN_CHAT_ID, simple_message)
+            print(f"✅ Дубль-заявка отправлена админу")
+        except:
+            print(f"❌ И дубль не удался: {error_text}")
+    
+    # Очищаем данные
+    del user_data[chat_id]
     """Отправляет заявку админу и благодарит клиента"""
     
     if chat_id in user_data:
@@ -526,3 +554,4 @@ if __name__ == '__main__':
             time.sleep(5)
 
             print("🔄 Перезапускаю...")
+

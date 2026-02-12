@@ -351,7 +351,7 @@ def get_phone(message):
                     phone = '+7' + phone[1:]
                 
                 user_data[chat_id]['phone'] = phone
-               def send_booking_to_admin(chat_id):
+                def send_booking_to_admin(chat_id):
     """
     Отправляет заявку админу и благодарит клиента
     ИСПРАВЛЕНО: теперь клиент НЕ видит ложных ошибок!
@@ -554,4 +554,5 @@ if __name__ == '__main__':
             time.sleep(5)
 
             print("🔄 Перезапускаю...")
+
 

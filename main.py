@@ -164,7 +164,6 @@ def contacts(message):
     bot.send_message(
         message.chat.id,
         text,
-        parse_mode='Markdown',
         reply_markup=back_keyboard()
     )
 
@@ -363,3 +362,4 @@ if __name__ == '__main__':
             print("🔄 Перезапуск через 5 секунд...")
             import time
             time.sleep(5)
+
